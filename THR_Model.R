@@ -1,29 +1,68 @@
 ############ THR model #########################
+
+##### (1) Set-up Model ######
+
 ### Set working directory as the folder this is stored in
 require("rstudioapi")
 setwd(dirname(getActiveDocumentContext()$path)) # Set working directory to source file
 
-#########**** PARAMETERS *****######
-##### DETERMINISTIC PARAMETERS ######
-# DISCOUNT RATES:
+### libraries
+if(!require(ggplot2)) install.packages('ggplot2')
+library(ggplot2)
+if(!require(reshape2)) install.packages('reshape2')
+library(reshape2)
+
+#  Reading the data needed from csv files
+life.table <- read.csv("life-table.csv", header=TRUE) ## importing lifetable
+colnames(life.table) <- c("Age","Index","Males","Female") ## making sure column names are correct
+hazards <- read.csv("hazardfunction.csv", header=TRUE) ## importing the hazard inputs from the regression analysis
+cov.55 <- read.csv("cov55.csv",row.names=1,header=TRUE) ## importing the covariance matrix
+
+### Structural inputs
+state.names <- c("P-THR","successP-THR","R-THR","successR-THR","Death")
+n.states <- length(state.names) # number of states in the model
+seed <- c(1,0,0,0,0) #  Seed the starting states of the model
+cycles <- 60 ## number of cycles running the model
+cycle.v <- 1:cycles ## a vector of cycle numbers 1 - 60
 dr.c <- 0.06 ## set the discount rate for costs (6%)
 dr.o <- 0.015 ## set the discount rate for outcomes (15%)
+discount.factor.c <- 1/(1+dr.c)^cycle.v ## the discount factor matrix
+discount.factor.o <- 1/(1+dr.o)^cycle.v  ## discount factor matrix for utility 
+
+
+##### (2) DETERMINISTIC PARAMETERS ######
+
 # COSTS:
 c.SP0 <- 394 ## Cost of standard prosthesis
 c.NP1 <- 579 ## Cost of new prosthesis 1
 c.primary <- 0  ## Cost of a primary THR procedure - set to 0 for this model 
 c.success <- 0 ## Cost of success - set to 0 for this model
 
-## Defining shape and scale parameters to be used in probabilistic analyses
+
+### (3) Define Hazard function ####
+
+## Coefficients - on the log hazard scale
+mn.lngamma <- hazards$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
+mn.cons <- hazards$coefficient[2] ##Constant in survival analysis for baseline hazard
+mn.ageC <- hazards$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
+mn.maleC <- hazards$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
+mn.NP1 <- hazards$coefficient[5]
+mn <- c(mn.lngamma, mn.cons,mn.ageC,mn.maleC,mn.NP1) ## vector of mean values from the regression analysis
+cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
+
+
+#### (4) Defining shape and scale parameters ####
 mn.cRevision <- 5294 ## mean cost of revision surgery
 se.cRevision <- 1487 ## standard error of cost of revision surgery
 a.cRevision <- (mn.cRevision/se.cRevision)^2 ## alpha value for cost of revision surgery 
 b.cRevision <- (se.cRevision^2)/mn.cRevision ## beta value for cost of revision surgery
+
 ###  Transition probabilities - alpha & beta values:
 a.PTHR2dead <- 2 ## alpha value for operative mortality from primary surgery
 b.PTHR2dead <- 100- a.PTHR2dead ## beta value for operative mortality from primary surgery
 a.rrr <- 4   ## alpha value for re-revision risk
 b.rrr <- 100-a.rrr  ## beta value for re-revision risk
+
 ##  UTILITIES:
 # primary prosthesis
 mn.uSuccessP <- 0.85 ## mean utility value for successful primary prosthesis
@@ -44,32 +83,8 @@ ab.uRevision <- mn.uRevision*(1-mn.uRevision)/(se.uRevision^2)-1 ## alpha + beta
 a.uRevision  <- mn.uRevision*ab.uRevision ## alpha (a)
 b.uRevision  <- a.uRevision*(1-mn.uRevision)/mn.uRevision ## beta(b)
 
-### Structural inputs
-state.names <- c("P-THR","successP-THR","R-THR","successR-THR","Death")
-n.states <- length(state.names) # number of states in the model
-seed <- c(1,0,0,0,0) #  Seed the starting states of the model
-cycles <- 60 ## number of cycles running the model
-cycle.v <- 1:cycles ## a vector of cycle numbers 1 - 60
-discount.factor.c <- 1/(1+dr.c)^cycle.v ## the discount factor matrix
-discount.factor.o <- 1/(1+dr.o)^cycle.v  ## discount factor matrix for utility 
+#####**** (5) SAMPLE FUNCTION ******#####
 
-#  Reading the data needed from csv files
-life.table <- read.csv("life-table.csv", header=TRUE) ## importing lifetable
-colnames(life.table) <- c("Age","Index","Males","Female") ## making sure column names are correct
-hazards <- read.csv("hazardfunction.csv", header=TRUE) ## importing the hazard inputs from the regression analysis
-cov.55 <- read.csv("cov55.csv",row.names=1,header=TRUE) ## importing the covariance matrix
-
-##  Hazard function ####
-## Coefficients - on the log hazard scale
-mn.lngamma <- hazards$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
-mn.cons <- hazards$coefficient[2] ##Constant in survival analysis for baseline hazard
-mn.ageC <- hazards$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
-mn.maleC <- hazards$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
-mn.NP1 <- hazards$coefficient[5]
-mn <- c(mn.lngamma, mn.cons,mn.ageC,mn.maleC,mn.NP1) ## vector of mean values from the regression analysis
-cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
-
-#####**** SAMPLE FUNCTION ******#####
 sim.runs <- 1000 
 
 psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
@@ -96,7 +111,7 @@ state.utilities.df <- data.frame(uprimary=rep(0, sim.runs),
                                  uSuccessP, uRevision, uSuccessR,
                                  udeath=rep(0, sim.runs))
 
-##  Hazard function ####
+## (6) Hazard function sampling ####
 z <- matrix(rnorm(5*sim.runs, 0, 1), nrow = sim.runs, ncol = 5) ## 5 random draws, by sim.runs
 r.table <- matrix(0, nrow = sim.runs, ncol = 5)
 colnames(r.table) <- c("lngamma", "cons", "age", "male", "NP1")
@@ -112,6 +127,8 @@ gamma.vec <- exp(r$lngamma)
 lambda.vec <- exp(r$cons + age * r$age + male*r$male)
 RR.vec <- exp(r$NP1)
 survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
+
+#### (7) Life-table sampling #####
 
 # set life table values beased on age and sex (not probablistic but dependent on)
 # age and sex variables chosen
@@ -134,6 +151,7 @@ return(sample.output)
 
 sample.output <- psa.sampling()
 
+### (8) Defining outputs from sampling #####
 RR.vec <- sample.output$RR.vec
 omr.df <- sample.output$omr.df
 tp.rrr.vec <- sample.output$tp.rrr.vec
@@ -144,7 +162,7 @@ mortality.vec <- sample.output$mortality.vec
 ## take a look at the above vectors and data.frames to see the samples produced
 ## these are defined out of the list here for use in the value of information analysis later on
 
-####***** THR MODEL FUNCTION ****#####
+####***** (9) THR MODEL FUNCTION ****#####
 model.THR <- function(RR.NP1, ## from RR.vec
                       omr,  ## from omr.df
                       tp.rrr, ## from tp.rrr.vec
@@ -169,7 +187,8 @@ model.THR <- function(RR.NP1, ## from RR.vec
   tp.RTHR2dead <- unlist(omr[1,2])
   gamma <- unlist(survival[1,1])
   lambda <- unlist(survival[1,2])
-   # Calculate revision risks 
+  
+  ### (10) Integrating revision and mortality risks #### 
   revision.risk.sp0 <- 1- exp(lambda * ((cycle.v-1) ^gamma-cycle.v ^gamma))
   revision.risk.np1 <- 1- exp(lambda * RR.NP1 * ((cycle.v-1) ^gamma-cycle.v ^gamma))
   # Transition arrays
@@ -194,7 +213,7 @@ model.THR <- function(RR.NP1, ## from RR.vec
   trace.SP0[1,] <- seed%*%tm.SP0[,,1]
   
   for (i in 2:cycles) trace.SP0[i,] <- trace.SP0[i-1,]%*%tm.SP0[,,i]
-  #  NP1 ARM
+  #### (11)  NP1 ARM #####
   tm.NP1 <- array(data=0,dim=c(n.states, n.states, cycles),
                   dimnames= list(state.names, state.names, 1:cycles)) ## an empty array of dimenions (number of states, number of states, number of cycles)
   ## naming all dimensions
@@ -217,6 +236,7 @@ model.THR <- function(RR.NP1, ## from RR.vec
   trace.NP1[1,] <- seed%*%tm.NP1[,,1]
   for (i in 2:cycles) trace.NP1[i,] <- trace.NP1[i-1,]%*%tm.NP1[,,i]
   
+  #### (12) Analysis #####
   # COST #
   cost.SP0 <- trace.SP0%*%state.costs  
   disc.cost.SP0 <- (discount.factor.c%*%cost.SP0) + c.SP0   
@@ -240,7 +260,8 @@ model.THR <- function(RR.NP1, ## from RR.vec
   
 }
 
-#### RUNNING THE SIMULATIONS ########
+#### (13) Running the simulations ########
+
 ## creating an empty data.frame for simulation results to fill:
 simulation.results <- data.frame("cost.SP0" = rep(as.numeric(NA), sim.runs), ## use the rep() function to create sim.runs rows of values
                                  "qalys.SP0"= rep(as.numeric(NA),sim.runs),
@@ -260,7 +281,8 @@ for(i in 1:sim.runs){
 }
 
 
-# Estimating the average net monetary benefit of the new treatment
+### (14) Estimating average net monetary benefit ####
+
 p.CE<-function(WTP, simulation.results) {# Estimate the probability of cost-effectiveness for a given willingness-to-pay ceiling ratio
   ## a function that estimates the probability of the new intervention
   # being cost-effective 
@@ -283,7 +305,8 @@ for (i in 1:length(WTP.values)) {
   CEAC[i,"pCE"]<- p.CE(CEAC[i,"WTP"], simulation.results)
 }
 
-##### SUBGROUP ANALYSES ######
+##### (15) Subgroup Analyses ######
+
 # CREATE ARRAY TO STORE THE RESULTS OF THE MODEL IN EACH SUBGROUP
 subgroups.names <- c("Male 40", "Male 60", "Male 80", "Female 40", "Female 60", "Female 80")
 subgroups.n <- length(subgroups.names)
@@ -326,10 +349,7 @@ for (i in 1:length(WTP.values)) {
   
 ######***PLOTS****#####################
   
-  #### COST-EFFECTIVENESS PLANES & COST-EFFECTIVENESS ACCEPTABILITY CURVES #####
-  # Install package and load library
-  if(!require(ggplot2)) install.packages('ggplot2')
-  library(ggplot2)
+  #### (16) COST-EFFECTIVENESS PLANE #####
   ## Plotting:
   xlabel = "Incremental QALYs"
   ylabel = "Incremental costs"
@@ -357,11 +377,8 @@ for (i in 1:length(WTP.values)) {
     scale_x_continuous(expand = c(0, 0.1)) + 
     scale_y_continuous(limits = c(0,1), breaks=seq(0,1,0.1), expand = c(0, 0))
   
-  
+  ### (17) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
   ## To plot the CEAC for subgroups We need to reshape the data from wide to long to use in ggplot 
-  # Install package and load library
-  if(!require(reshape2)) install.packages('reshape2')
-  library(reshape2)
   CEAC.subgroups.long <- melt(CEAC.subgroups, id.vars = c("WTP"))
   colnames(CEAC.subgroups.long) <- c("WTP", "group", "pCE")
   ## plotting:
