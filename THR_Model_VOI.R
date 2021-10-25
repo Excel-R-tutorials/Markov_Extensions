@@ -1,5 +1,5 @@
 # Loading in data and model
-source("Manuscript/THR_Model.R")
+source("THR_Model.R")
 
 #### SETTING VALUE OF INFORMATION POPULATION PARAMETERS ####
 population <- 40000 
