@@ -5,7 +5,7 @@
 require("rstudioapi")
 setwd(dirname(getActiveDocumentContext()$path)) # Set working directory to source file
 
-### libraries
+### PACKAGES USED
 if(!require(ggplot2)) install.packages('ggplot2')
 library(ggplot2)
 if(!require(reshape2)) install.packages('reshape2')
@@ -81,7 +81,7 @@ ab.uRevision <- mn.uRevision*(1-mn.uRevision)/(se.uRevision^2)-1 ## alpha + beta
 a.uRevision  <- mn.uRevision*ab.uRevision ## alpha (a)
 b.uRevision  <- a.uRevision*(1-mn.uRevision)/mn.uRevision ## beta(b)
 
-#####**** (5) SAMPLE FUNCTION ******#####
+#####**** (5) SET UP SAMPLE FUNCTION ******#####
 
 sim.runs <- 1000 
 
