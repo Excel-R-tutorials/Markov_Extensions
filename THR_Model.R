@@ -1,7 +1,6 @@
 ############ THR model #########################
 
 ##### (1) Set-up Model ######
-
 ### Set working directory as the folder this is stored in
 require("rstudioapi")
 setwd(dirname(getActiveDocumentContext()$path)) # Set working directory to source file
@@ -13,40 +12,39 @@ if(!require(reshape2)) install.packages('reshape2')
 library(reshape2)
 
 #  Reading the data needed from csv files
-life.table <- read.csv("life-table.csv", header=TRUE) ## importing lifetable
-colnames(life.table) <- c("Age","Index","Males","Female") ## making sure column names are correct
-hazards <- read.csv("hazardfunction.csv", header=TRUE) ## importing the hazard inputs from the regression analysis
+life.tables <- read.csv("life-table.csv", header=TRUE) ## importing lifetable
+colnames(life.tables) <- c("Age","Index","Males","Female") ## making sure column names are correct
+hazard.function <- read.csv("hazardfunction.csv", header=TRUE) ## importing the hazard inputs from the regression analysis
 cov.55 <- read.csv("cov55.csv",row.names=1,header=TRUE) ## importing the covariance matrix
 
 ### Structural inputs
-state.names <- c("P-THR","successP-THR","R-THR","successR-THR","Death")
+state.names <- c("PrimaryTHR","SuccessP","RevisionTHR","SuccessR","Death")
 n.states <- length(state.names) # number of states in the model
 seed <- c(1,0,0,0,0) #  Seed the starting states of the model
 cycles <- 60 ## number of cycles running the model
 cycle.v <- 1:cycles ## a vector of cycle numbers 1 - 60
-dr.c <- 0.06 ## set the discount rate for costs (6%)
-dr.o <- 0.015 ## set the discount rate for outcomes (15%)
-discount.factor.c <- 1/(1+dr.c)^cycle.v ## the discount factor matrix
-discount.factor.o <- 1/(1+dr.o)^cycle.v  ## discount factor matrix for utility 
-
+cDR <- 0.06 ## set the discount rate for costs (6%)
+oDR <- 0.015 ## set the discount rate for outcomes (15%)
+discount.factor.c <- 1/(1+cDR)^cycle.v ## the discount factor matrix
+discount.factor.o <- 1/(1+oDR)^cycle.v  ## discount factor matrix for utility 
 
 ##### (2) DETERMINISTIC PARAMETERS ######
 
 # COSTS:
-c.SP0 <- 394 ## Cost of standard prosthesis
-c.NP1 <- 579 ## Cost of new prosthesis 1
-c.primary <- 0  ## Cost of a primary THR procedure - set to 0 for this model 
-c.success <- 0 ## Cost of success - set to 0 for this model
+cSP0 <- 394 ## Cost of standard prosthesis
+cNP1 <- 579 ## Cost of new prosthesis 1
+cPrimary <- 0  ## Cost of a primary THR procedure - set to 0 for this model 
+cSuccess <- 0 ## Cost of success - set to 0 for this model
 
 
 ### (3) Define Hazard function ####
 
 ## Coefficients - on the log hazard scale
-mn.lngamma <- hazards$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
-mn.cons <- hazards$coefficient[2] ##Constant in survival analysis for baseline hazard
-mn.ageC <- hazards$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
-mn.maleC <- hazards$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
-mn.NP1 <- hazards$coefficient[5]
+mn.lngamma <- hazard.function$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
+mn.cons <- hazard.function$coefficient[2] ##Constant in survival analysis for baseline hazard
+mn.ageC <- hazard.function$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
+mn.maleC <- hazard.function$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
+mn.NP1 <- hazard.function$coefficient[5]
 mn <- c(mn.lngamma, mn.cons,mn.ageC,mn.maleC,mn.NP1) ## vector of mean values from the regression analysis
 cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
 
@@ -88,65 +86,65 @@ b.uRevision  <- a.uRevision*(1-mn.uRevision)/mn.uRevision ## beta(b)
 sim.runs <- 1000 
 
 psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
-#### FUNCTION: sample probablistic parameters according to age and sex
-#### INPUTS: age (numeric), male (0 for female, 1 for male), though 
+  #### FUNCTION: sample probablistic parameters according to age and sex
+  #### INPUTS: age (numeric), male (0 for female, 1 for male), though 
   #### other variables which are defined above are called within the function
   ### e.g. cycles
-#### OUTPUTS: a list with data frames and vectors for probablistic parameters 
+  #### OUTPUTS: a list with data frames and vectors for probablistic parameters 
   
-###  Transition probabilities
-tp.PTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead) ## OMR following primary THR
-tp.RTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead)  ## OMR following revision THR
-## creating a data.frame of sampled transition probabilites
-omr.df <- data.frame(tp.PTHR2dead, tp.RTHR2dead) 
-tp.rrr.vec <-rbeta(sim.runs, a.rrr, b.rrr) ## Re-revision risk transitions vector
-###  Costs
-c.revision.vec <- rgamma(sim.runs, shape=a.cRevision, scale=b.cRevision) ## Gamma distribution draw for cost of revision surgery
-##  Utilities
-uSuccessP <- rbeta(sim.runs, a.uSuccessP, b.uSuccessP) 
-uSuccessR <- rbeta(sim.runs, a.uSuccessR, b.uSuccessR) 
-uRevision <- rbeta(sim.runs, a.uRevision, b.uRevision) 
-## Make a data frame to pass into the function
-state.utilities.df <- data.frame(uprimary=rep(0, sim.runs), 
-                                 uSuccessP, uRevision, uSuccessR,
-                                 udeath=rep(0, sim.runs))
-
-## (6) Hazard function sampling ####
-z <- matrix(rnorm(5*sim.runs, 0, 1), nrow = sim.runs, ncol = 5) ## 5 random draws, by sim.runs
-r.table <- matrix(0, nrow = sim.runs, ncol = 5)
-colnames(r.table) <- c("lngamma", "cons", "age", "male", "NP1")
-
-for(i in 1:sim.runs){
-  Tz <- cholm %*% z[i,] 
-  x <- mn + Tz 
-  r.table[i,] <- x[,1]
-}
-
-r <- as.data.frame(r.table)
-gamma.vec <- exp(r$lngamma)
-lambda.vec <- exp(r$cons + age * r$age + male*r$male)
-RR.vec <- exp(r$NP1)
-survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
-
-#### (7) Life-table sampling #####
-
-# set life table values beased on age and sex (not probablistic but dependent on)
-# age and sex variables chosen
-current.age <- age + cycle.v ## a vector of cohort age throughout the model
-interval <- findInterval(current.age, life.table$Index)
-death.risk <- data.frame(age = current.age, males = life.table[interval,3], females = life.table[interval,4])
-col.key <- 3-male 
-mortality.vec <- death.risk[,col.key]
-
-## combine outputs
-sample.output <- list(RR.vec = RR.vec,
-                      omr.df = omr.df,
-                      tp.rrr.vec = tp.rrr.vec,
-                      survival.df = survival.df,
-                      c.revision.vec = c.revision.vec,
-                       state.utilities.df = state.utilities.df,
-                      mortality.vec = mortality.vec)
-return(sample.output)
+  ###  Transition probabilities
+  tp.PTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead) ## OMR following primary THR
+  tp.RTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead)  ## OMR following revision THR
+  ## creating a data.frame of sampled transition probabilites
+  omr.df <- data.frame(tp.PTHR2dead, tp.RTHR2dead) 
+  tp.rrr.vec <-rbeta(sim.runs, a.rrr, b.rrr) ## Re-revision risk transitions vector
+  ###  Costs
+  c.revision.vec <- rgamma(sim.runs, shape=a.cRevision, scale=b.cRevision) ## Gamma distribution draw for cost of revision surgery
+  ##  Utilities
+  uSuccessP <- rbeta(sim.runs, a.uSuccessP, b.uSuccessP) 
+  uSuccessR <- rbeta(sim.runs, a.uSuccessR, b.uSuccessR) 
+  uRevision <- rbeta(sim.runs, a.uRevision, b.uRevision) 
+  ## Make a data frame to pass into the function
+  state.utilities.df <- data.frame(uprimary=rep(0, sim.runs), 
+                                   uSuccessP, uRevision, uSuccessR,
+                                   udeath=rep(0, sim.runs))
+  
+  ## (6) Hazard function sampling ####
+  z <- matrix(rnorm(5*sim.runs, 0, 1), nrow = sim.runs, ncol = 5) ## 5 random draws, by sim.runs
+  r.table <- matrix(0, nrow = sim.runs, ncol = 5)
+  colnames(r.table) <- c("lngamma", "cons", "age", "male", "NP1")
+  
+  for(i in 1:sim.runs){
+    Tz <- cholm %*% z[i,] 
+    x <- mn + Tz 
+    r.table[i,] <- x[,1]
+  }
+  
+  r <- as.data.frame(r.table)
+  gamma.vec <- exp(r$lngamma)
+  lambda.vec <- exp(r$cons + age * r$age + male*r$male)
+  RR.vec <- exp(r$NP1)
+  survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
+  
+  #### (7) Life-table sampling #####
+  
+  # set life table values beased on age and sex (not probablistic but dependent on)
+  # age and sex variables chosen
+  current.age <- age + cycle.v ## a vector of cohort age throughout the model
+  interval <- findInterval(current.age, life.tables$Index)
+  death.risk <- data.frame(age = current.age, males = life.tables[interval,3], females = life.tables[interval,4])
+  col.key <- 3-male 
+  mortality.vec <- death.risk[,col.key]
+  
+  ## combine outputs
+  sample.output <- list(RR.vec = RR.vec,
+                        omr.df = omr.df,
+                        tp.rrr.vec = tp.rrr.vec,
+                        survival.df = survival.df,
+                        c.revision.vec = c.revision.vec,
+                        state.utilities.df = state.utilities.df,
+                        mortality.vec = mortality.vec)
+  return(sample.output)
 }
 
 sample.output <- psa.sampling()
@@ -179,7 +177,7 @@ model.THR <- function(RR.NP1, ## from RR.vec
   
   ## First, we need to unpack values from the data.frames provided to the function 
   # COSTS:
-  state.costs<-c(c.primary, c.success, c.revision, c.success, 0) ## a vector with the costs for each state
+  state.costs<-c(cPrimary, cSuccess, c.revision, cSuccess, 0) ## a vector with the costs for each state
   # UTILITIES:
   state.utilities <- unlist(state.util)
   # TRANSITIONS
@@ -195,16 +193,16 @@ model.THR <- function(RR.NP1, ## from RR.vec
   tm.SP0 <- array(data=0,dim=c(n.states, n.states, cycles),
                   dimnames= list(state.names, state.names, 1:cycles)) ## an empty array of dimenions (number of states, number of states, number of cycles)
   # Now using vectorisation to complete this 
-  tm.SP0["P-THR","Death",] <- tp.PTHR2dead 
-  tm.SP0["P-THR","successP-THR",] <- 1 - tp.PTHR2dead 
-  tm.SP0["successP-THR","R-THR",] <- revision.risk.sp0 
-  tm.SP0["successP-THR","Death",] <- mortality.vec
-  tm.SP0["successP-THR","successP-THR",] <- 1 - revision.risk.sp0 - mortality.vec
-  tm.SP0["R-THR","Death",] <- tp.RTHR2dead + mortality.vec
-  tm.SP0["R-THR","successR-THR",] <- 1 - tp.RTHR2dead - mortality.vec
-  tm.SP0["successR-THR","R-THR",] <- tp.rrr
-  tm.SP0["successR-THR","Death",] <- mortality.vec
-  tm.SP0["successR-THR","successR-THR",] <- 1 - tp.rrr - mortality.vec
+  tm.SP0["PrimaryTHR","Death",] <- tp.PTHR2dead 
+  tm.SP0["PrimaryTHR","SuccessP",] <- 1 - tp.PTHR2dead 
+  tm.SP0["SuccessP","RevisionTHR",] <- revision.risk.sp0 
+  tm.SP0["SuccessP","Death",] <- mortality.vec
+  tm.SP0["SuccessP","SuccessP",] <- 1 - revision.risk.sp0 - mortality.vec
+  tm.SP0["RevisionTHR","Death",] <- tp.RTHR2dead + mortality.vec
+  tm.SP0["RevisionTHR","SuccessR",] <- 1 - tp.RTHR2dead - mortality.vec
+  tm.SP0["SuccessR","RevisionTHR",] <- tp.rrr
+  tm.SP0["SuccessR","Death",] <- mortality.vec
+  tm.SP0["SuccessR","SuccessR",] <- 1 - tp.rrr - mortality.vec
   tm.SP0["Death","Death",] <- 1 
   #  Create a trace for the standard prosthesis arm
   trace.SP0 <- matrix(data=0, nrow=cycles, ncol=n.states)
@@ -218,16 +216,16 @@ model.THR <- function(RR.NP1, ## from RR.vec
                   dimnames= list(state.names, state.names, 1:cycles)) ## an empty array of dimenions (number of states, number of states, number of cycles)
   ## naming all dimensions
   ### create a loop that creates a time dependent transition matrix for each cycle
-  tm.NP1["P-THR","Death",] <- tp.PTHR2dead ## Primary THR either enter the death state or.. or..
-  tm.NP1["P-THR","successP-THR",] <- 1 - tp.PTHR2dead ## they go into the success THR state 
-  tm.NP1["successP-THR","R-THR",] <- revision.risk.np1 ## revision risk with NP1 treatment arm 
-  tm.NP1["successP-THR","Death",] <- mortality.vec
-  tm.NP1["successP-THR","successP-THR",] <- 1 - revision.risk.np1 - mortality.vec
-  tm.NP1["R-THR","Death",] <- tp.RTHR2dead + mortality.vec
-  tm.NP1["R-THR","successR-THR",] <- 1 - tp.RTHR2dead - mortality.vec
-  tm.NP1["successR-THR","R-THR",] <- tp.rrr
-  tm.NP1["successR-THR","Death",] <- mortality.vec[i]
-  tm.NP1["successR-THR","successR-THR",] <- 1 - tp.rrr - mortality.vec
+  tm.NP1["PrimaryTHR","Death",] <- tp.PTHR2dead ## Primary THR either enter the death state or.. or..
+  tm.NP1["PrimaryTHR","SuccessP",] <- 1 - tp.PTHR2dead ## they go into the success THR state 
+  tm.NP1["SuccessP","RevisionTHR",] <- revision.risk.np1 ## revision risk with NP1 treatment arm 
+  tm.NP1["SuccessP","Death",] <- mortality.vec
+  tm.NP1["SuccessP","SuccessP",] <- 1 - revision.risk.np1 - mortality.vec
+  tm.NP1["RevisionTHR","Death",] <- tp.RTHR2dead + mortality.vec
+  tm.NP1["RevisionTHR","SuccessR",] <- 1 - tp.RTHR2dead - mortality.vec
+  tm.NP1["SuccessR","RevisionTHR",] <- tp.rrr
+  tm.NP1["SuccessR","Death",] <- mortality.vec[i]
+  tm.NP1["SuccessR","SuccessR",] <- 1 - tp.rrr - mortality.vec
   tm.NP1["Death","Death",] <- 1 
   
   #  Create a trace for the standard prosthesis arm
@@ -239,9 +237,9 @@ model.THR <- function(RR.NP1, ## from RR.vec
   #### (12) Analysis #####
   # COST #
   cost.SP0 <- trace.SP0%*%state.costs  
-  disc.cost.SP0 <- (discount.factor.c%*%cost.SP0) + c.SP0   
+  disc.cost.SP0 <- (discount.factor.c%*%cost.SP0) + cSP0   
   cost.NP1 <- trace.NP1%*%state.costs  
-  disc.cost.NP1 <- (discount.factor.c%*%cost.NP1) + c.NP1 
+  disc.cost.NP1 <- (discount.factor.c%*%cost.NP1) + cNP1 
   
   # QALYS #
   QALYs.SP0 <- trace.SP0%*%state.utilities ## utility per cycle
@@ -275,7 +273,7 @@ simulation.results <- data.frame("cost.SP0" = rep(as.numeric(NA), sim.runs), ## 
 for(i in 1:sim.runs){
   simulation.results[i,] <-model.THR(RR.vec[i], omr.df[i,],  
                                      tp.rrr.vec[i], survival.df[i,],
-                                      c.revision.vec[i], 
+                                     c.revision.vec[i], 
                                      state.utilities.df[i,], mortality.vec) 
   
 }
@@ -324,9 +322,9 @@ sample.sub[[6]]<- psa.sampling(age = 80, male = 0)
 
 for(i in 1:sim.runs){ 
   for(j in 1:6){ ## column = each subgroup
-  simulation.subgroups[i,,j] <- model.THR(sample.sub[[j]]$RR.vec[i], sample.sub[[j]]$omr.df[i,],  sample.sub[[j]]$tp.rrr.vec[i], 
-                                                                   sample.sub[[j]]$survival.df[i,],sample.sub[[j]]$c.revision.vec[i], 
-                                                                   sample.sub[[j]]$state.utilities.df[i,], mortality.vec = sample.sub[[j]]$mortality.vec)
+    simulation.subgroups[i,,j] <- model.THR(sample.sub[[j]]$RR.vec[i], sample.sub[[j]]$omr.df[i,],  sample.sub[[j]]$tp.rrr.vec[i], 
+                                            sample.sub[[j]]$survival.df[i,],sample.sub[[j]]$c.revision.vec[i], 
+                                            sample.sub[[j]]$state.utilities.df[i,], mortality.vec = sample.sub[[j]]$mortality.vec)
   }
 }
 
@@ -345,51 +343,51 @@ for (i in 1:length(WTP.values)) {
   CEAC.subgroups[i,6]<-p.CE(WTP.values[i], simulation.subgroups[,,5])
   CEAC.subgroups[i,7]<-p.CE(WTP.values[i], simulation.subgroups[,,6])
 }
-  
-  
+
+
 ######***PLOTS****#####################
-  
-  #### (16) COST-EFFECTIVENESS PLANE #####
-  ## Plotting:
-  xlabel = "Incremental QALYs"
-  ylabel = "Incremental costs"
-  ggplot(simulation.results) + 
-    geom_point(shape = 21, size = 2, colour = "black", fill = NA, alpha = 0.5, aes(x=inc.qalys, y=inc.cost)) + 
-    labs(x = xlabel, text = element_text(size=10)) + labs (y = ylabel, text = element_text(size=10)) + theme_classic() +
-    theme(legend.title = element_blank(), axis.title=element_text(face="bold"), 
-          axis.title.x = element_text(margin = margin(t = 7, r = 0, b = 3, l = 0)), 
-          axis.title.y = element_text(margin = margin(t = 0, r = 7, b = 0, l = 3)), 
-          panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
-          legend.key.width=unit(1.8,"line"), text = element_text(size=12),
-          plot.margin=unit(c(1.2,0.5,0,1.2),"cm"))
-  
-  
-  ## plotting:
-  xlabel = "Willingness to pay threshold"
-  ylabel = "Probability cost-effective"
-  ggplot(CEAC) + geom_line(aes(x=WTP, y=pCE), size=1) + 
-    labs(x = xlabel, text = element_text(size=10)) + labs(y = ylabel, text = element_text(size=10)) + theme_classic() +
-    theme(legend.title = element_blank(), axis.title=element_text(face="bold"), 
-          axis.title.x = element_text(margin = margin(t = 7, r = 0, b = 3, l = 0)), 
-          axis.title.y = element_text(margin = margin(t = 0, r = 7, b = 0, l = 3)), 
-          panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
-          legend.key.width=unit(1.8,"line"), text = element_text(size=12)) + 
-    scale_x_continuous(expand = c(0, 0.1)) + 
-    scale_y_continuous(limits = c(0,1), breaks=seq(0,1,0.1), expand = c(0, 0))
-  
-  ### (17) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
-  ## To plot the CEAC for subgroups We need to reshape the data from wide to long to use in ggplot 
-  CEAC.subgroups.long <- melt(CEAC.subgroups, id.vars = c("WTP"))
-  colnames(CEAC.subgroups.long) <- c("WTP", "group", "pCE")
-  ## plotting:
-  xlabel = "Willingness to pay threshold"
-  ylabel = "Probability cost-effective"
-  ggplot(CEAC.subgroups.long) + geom_line(aes(x=WTP, y=pCE, color=group), size=1) + 
-    labs(x = xlabel, text = element_text(size=10)) + labs(y = ylabel, text = element_text(size=10)) + theme_classic() +
-    theme(legend.title = element_blank(), axis.title=element_text(face="bold"), 
-          axis.title.x = element_text(margin = margin(t = 7, r = 0, b = 3, l = 0)), 
-          axis.title.y = element_text(margin = margin(t = 0, r = 7, b = 0, l = 3)), 
-          panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
-          legend.key.width=unit(1.8,"line"), text = element_text(size=12)) + 
-    scale_x_continuous(expand = c(0, 0.1)) + 
-    scale_y_continuous(limits = c(0,1), breaks=seq(0,1,0.1), expand = c(0, 0))
+
+#### (16) COST-EFFECTIVENESS PLANE #####
+## Plotting:
+xlabel = "Incremental QALYs"
+ylabel = "Incremental costs"
+ggplot(simulation.results) + 
+  geom_point(shape = 21, size = 2, colour = "black", fill = NA, alpha = 0.5, aes(x=inc.qalys, y=inc.cost)) + 
+  labs(x = xlabel, text = element_text(size=10)) + labs (y = ylabel, text = element_text(size=10)) + theme_classic() +
+  theme(legend.title = element_blank(), axis.title=element_text(face="bold"), 
+        axis.title.x = element_text(margin = margin(t = 7, r = 0, b = 3, l = 0)), 
+        axis.title.y = element_text(margin = margin(t = 0, r = 7, b = 0, l = 3)), 
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+        legend.key.width=unit(1.8,"line"), text = element_text(size=12),
+        plot.margin=unit(c(1.2,0.5,0,1.2),"cm"))
+
+
+## plotting:
+xlabel = "Willingness to pay threshold"
+ylabel = "Probability cost-effective"
+ggplot(CEAC) + geom_line(aes(x=WTP, y=pCE), size=1) + 
+  labs(x = xlabel, text = element_text(size=10)) + labs(y = ylabel, text = element_text(size=10)) + theme_classic() +
+  theme(legend.title = element_blank(), axis.title=element_text(face="bold"), 
+        axis.title.x = element_text(margin = margin(t = 7, r = 0, b = 3, l = 0)), 
+        axis.title.y = element_text(margin = margin(t = 0, r = 7, b = 0, l = 3)), 
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+        legend.key.width=unit(1.8,"line"), text = element_text(size=12)) + 
+  scale_x_continuous(expand = c(0, 0.1)) + 
+  scale_y_continuous(limits = c(0,1), breaks=seq(0,1,0.1), expand = c(0, 0))
+
+### (17) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
+## To plot the CEAC for subgroups We need to reshape the data from wide to long to use in ggplot 
+CEAC.subgroups.long <- melt(CEAC.subgroups, id.vars = c("WTP"))
+colnames(CEAC.subgroups.long) <- c("WTP", "group", "pCE")
+## plotting:
+xlabel = "Willingness to pay threshold"
+ylabel = "Probability cost-effective"
+ggplot(CEAC.subgroups.long) + geom_line(aes(x=WTP, y=pCE, color=group), size=1) + 
+  labs(x = xlabel, text = element_text(size=10)) + labs(y = ylabel, text = element_text(size=10)) + theme_classic() +
+  theme(legend.title = element_blank(), axis.title=element_text(face="bold"), 
+        axis.title.x = element_text(margin = margin(t = 7, r = 0, b = 3, l = 0)), 
+        axis.title.y = element_text(margin = margin(t = 0, r = 7, b = 0, l = 3)), 
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+        legend.key.width=unit(1.8,"line"), text = element_text(size=12)) + 
+  scale_x_continuous(expand = c(0, 0.1)) + 
+  scale_y_continuous(limits = c(0,1), breaks=seq(0,1,0.1), expand = c(0, 0))
