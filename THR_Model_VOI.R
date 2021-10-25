@@ -1,7 +1,21 @@
+########### THR MODEL: VALUE OF INFORMATION ##############
+
+##### (1) SET UP AND SOURCE THE THR MODEL #######
+
+### PACKAGES USED 
+# Install package and load library
+if(!require(reshape2)) install.packages('reshape2')
+library(reshape2)
+if(!require(ggplot2)) install.packages('ggplot2')
+library(ggplot2)
+
 # Loading in data and model
 source("THR_Model.R")
+## Note that simulation results are read in from this, and used throughout 
+# see head(simulation.results)
 
-#### SETTING VALUE OF INFORMATION POPULATION PARAMETERS ####
+#### (2) SETTING VALUE OF INFORMATION POPULATION PARAMETERS ####
+
 population <- 40000 
 years <- 10
 evpi.disc <- 0.06
@@ -10,9 +24,9 @@ effective.population <- sum(population.seq)
 ## Create a vector of willingness to pay values
 WTP.values <- seq(from = 0, to = 50000, by = 100)
 
-#### EXPECTED VALUE OF PERFECT INFORMATION (EVPI) ####
 
-# Create a function to estimate EVPI (at a population level)
+#### (3) CREATE EXPECTED VALUE OF PERFECT INFORMATION (EVPI) AT A POPULATION LEVEL ####
+
 est.EVPI.pop <-function(WTP, effective.population, simulation.results) {
 
   # Estimate the NMB for two treatments, for each simulation
@@ -47,12 +61,11 @@ for (i in 1:length(WTP.values)) {
 ## Show the highest EVPI value
 EVPI.results[EVPI.results$EVPI == max(EVPI.results$EVPI),] 
 
-#### EXPECTED VALUE OF PARTIAL PERFECT INFORMATION (EVPPI) ANALYSIS #### 
+#### (4) SET INNER AND OUTER LOOP FRAMEWORK FOR EXPECTED VALUE OF PARTIAL PERFECT INFORMATION (EVPPI) ANALYSIS #### 
 
 ## Enter inner and outer loop numbers - note these must be higher than sim.runs 
 inner.loops <- 100
 outer.loops <- 100
-
 
 # Create a matrix to store the inner loop results
 inner.results <- matrix(0, inner.loops, 6)
@@ -62,6 +75,7 @@ evppi.results.SP0 <- matrix(0, nrow = outer.loops, ncol = length(WTP.values))
 colnames(evppi.results.SP0) <- as.character(WTP.values)
 evppi.results.NP1 <- evppi.results.SP0 
 
+##### (5) NET MONETARY BENEFIT FUNCTION #######
 
 # Creating a function to estimate NMB across WTP values (for inner loop results)
 nmb.function <- function(WTP, results){
@@ -79,6 +93,7 @@ nmb.function <- function(WTP, results){
   
 }
 
+##### (6) EVPPI FUNCTION FOR WILLINGNESS-TO-PAY VALUES #####
 
 ## Function to estimate EVPPI across WTP values, using the outer loop results
 gen.evppi.results <- function(evppi.results1 = evppi.results.SP0, evppi.results2 = evppi.results.NP1, WTP = WTP.values, effective.pop = effective.population){
@@ -108,12 +123,10 @@ gen.evppi.results <- function(evppi.results1 = evppi.results.SP0, evppi.results2
   
 }
 
-
-
-# EVPPI SIMULATIONS # 
+#### (7) RUN EVPPI SIMULATIONS ######
 
 ## Now the EVPPI loops will be run - each selected different values for inner and outer loops
-parameter.groups <- 6
+parameter.groups <- 6 ## number of parameters/parameter groups to run the EVPPI on
 evppi.wide <- data.frame(wtp = WTP.values, RR = NA, OMR = NA,  surv = NA, r.cost = NA, RRR = NA, util = NA)
 colnames(evppi.wide) <- c("WTP", "NP1 Relative risk",  "Operative mortality ratios", "Survival parameters", "Revision cost", "Re-revision risk", "Utilities")
 
@@ -160,13 +173,8 @@ for(j in 1:parameter.groups){
 head(evppi.wide,20)
 
 #####**** PLOTS *****#####
-# Install package and load library
-if(!require(reshape2)) install.packages('reshape2')
-library(reshape2)
-if(!require(ggplot2)) install.packages('ggplot2')
-library(ggplot2)
 
-## Plot results EVPI, per population
+##### (8) Ploting results EVPI, per population ####
 ggplot(EVPI.results) + geom_line(aes(x=WTP, y=EVPI), size=1) + 
   labs(x = "Willingness to pay threshold", text = element_text(size=10)) + 
   labs(y = "Expected Value of Perfect Information", text = element_text(size=10)) + theme_classic() +
@@ -179,7 +187,7 @@ ggplot(EVPI.results) + geom_line(aes(x=WTP, y=EVPI), size=1) +
   scale_x_continuous(labels = scales::comma, expand = c(0, 0.1)) + 
   scale_y_continuous(labels = scales::comma, expand = c(0, 0))
 
-#### PLOTTING EVPPI RESULTS ####
+#### (9) PLOTTING EVPPI RESULTS ACROSS WILLINGNESS-TO-PAY THRESHOLDS ####
 
 # Convert from wide to long format
 evppi.long <- reshape2::melt(evppi.wide, id.vars = c("WTP"))
@@ -198,7 +206,9 @@ ggplot(evppi.long) + geom_line(aes(x=WTP, y=value, colour = variable), size=0.75
 # Note you will get a warning here that the plot does not show all the data in the data.frame
 
 
-# Plotting EVPPI at a particular WTP
+
+#### (10) PLOTTING EVPPI RESULTS AT A WILLINGNESS-TO-PAY THRESHOLD VALUE ####
+
 sub.evppi <- subset(evppi.long, WTP==2200)
 
 ggplot(sub.evppi, aes(x=variable, y=value)) +
