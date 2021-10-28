@@ -1,10 +1,6 @@
 ############ THR model #########################
 
 ##### (1) Set-up Model ######
-### Set working directory as the folder this is stored in
-require("rstudioapi")
-setwd(dirname(getActiveDocumentContext()$path)) # Set working directory to source file
-
 ### PACKAGES USED
 if(!require(ggplot2)) install.packages('ggplot2')
 library(ggplot2)
