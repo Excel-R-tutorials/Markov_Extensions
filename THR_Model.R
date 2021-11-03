@@ -7,6 +7,8 @@ library(ggplot2)
 if(!require(reshape2)) install.packages('reshape2')
 library(reshape2)
 
+set.seed(1234)
+
 #  Reading the data needed from csv files
 life.tables <- read.csv("life-table.csv", header=TRUE) ## importing lifetable
 colnames(life.tables) <- c("Age","Index","Males","Female") ## making sure column names are correct

@@ -22,7 +22,7 @@ evpi.disc <- 0.06
 population.seq <- population * (1/(1+evpi.disc) ^ c(0:(years-1)))
 effective.population <- sum(population.seq)
 ## Create a vector of willingness to pay values
-WTP.values <- seq(from = 0, to = 50000, by = 100)
+WTP.values <- seq(from = 0, to = 50000, by = 50)
 
 
 #### (3) CREATE EXPECTED VALUE OF PERFECT INFORMATION (EVPI) AT A POPULATION LEVEL ####
@@ -131,7 +131,7 @@ evppi.wide <- data.frame(wtp = WTP.values, RR = NA, OMR = NA,  surv = NA, r.cost
 colnames(evppi.wide) <- c("WTP", "NP1 Relative risk",  "Operative mortality ratios", "Survival parameters", "Revision cost", "Re-revision risk", "Utilities")
 
 # Set progres bar 
-pb = txtProgressBar(min = 0, max = outer.loops, initial = 0, style = 3)
+pb = txtProgressBar(min = 0, max = outer.loops*parameter.groups, initial = 0, style = 3)
 
 # Create loops for 1) parameter groups, 2) outer loops 3) inner loops
 for(j in 1:parameter.groups){
@@ -161,7 +161,7 @@ for(j in 1:parameter.groups){
     
     evppi.results.SP0[a,] <- nmb[[1]]
     evppi.results.NP1[a,] <- nmb[[2]]
-    setTxtProgressBar(pb,a)
+    setTxtProgressBar(pb,(j-1)*outer.loops+a)
     
   }
   
