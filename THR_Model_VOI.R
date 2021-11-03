@@ -22,7 +22,7 @@ evpi.disc <- 0.06
 population.seq <- population * (1/(1+evpi.disc) ^ c(0:(years-1)))
 effective.population <- sum(population.seq)
 ## Create a vector of willingness to pay values
-WTP.values <- seq(from = 0, to = 50000, by = 100)
+WTP.values <- seq(from = 0, to = 50000, by = 50)
 
 
 #### (3) CREATE EXPECTED VALUE OF PERFECT INFORMATION (EVPI) AT A POPULATION LEVEL ####
