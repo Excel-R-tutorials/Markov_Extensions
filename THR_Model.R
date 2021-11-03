@@ -7,13 +7,14 @@ library(ggplot2)
 if(!require(reshape2)) install.packages('reshape2')
 library(reshape2)
 
-set.seed(1234)
-
 #  Reading the data needed from csv files
 life.tables <- read.csv("life-table.csv", header=TRUE) ## importing lifetable
 colnames(life.tables) <- c("Age","Index","Males","Female") ## making sure column names are correct
 hazard.function <- read.csv("hazardfunction.csv", header=TRUE) ## importing the hazard inputs from the regression analysis
 cov.55 <- read.csv("cov55.csv",row.names=1,header=TRUE) ## importing the covariance matrix
+
+# setting the seed for reproducible results in sampling
+set.seed(1234)
 
 ### Structural inputs
 state.names <- c("PrimaryTHR","SuccessP","RevisionTHR","SuccessR","Death")
@@ -34,20 +35,7 @@ cNP1 <- 579 ## Cost of new prosthesis 1
 cPrimary <- 0  ## Cost of a primary THR procedure - set to 0 for this model 
 cSuccess <- 0 ## Cost of success - set to 0 for this model
 
-
-### (3) Define Hazard function ####
-
-## Coefficients - on the log hazard scale
-mn.lngamma <- hazard.function$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
-mn.cons <- hazard.function$coefficient[2] ##Constant in survival analysis for baseline hazard
-mn.ageC <- hazard.function$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
-mn.maleC <- hazard.function$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
-mn.NP1 <- hazard.function$coefficient[5]
-mn <- c(mn.lngamma, mn.cons,mn.ageC,mn.maleC,mn.NP1) ## vector of mean values from the regression analysis
-cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
-
-
-#### (4) Defining shape and scale parameters ####
+#### (3) Defining shape and scale values for probablistic parameters ####
 mn.cRevision <- 5294 ## mean cost of revision surgery
 se.cRevision <- 1487 ## standard error of cost of revision surgery
 a.cRevision <- (mn.cRevision/se.cRevision)^2 ## alpha value for cost of revision surgery 
@@ -79,7 +67,19 @@ ab.uRevision <- mn.uRevision*(1-mn.uRevision)/(se.uRevision^2)-1 ## alpha + beta
 a.uRevision  <- mn.uRevision*ab.uRevision ## alpha (a)
 b.uRevision  <- a.uRevision*(1-mn.uRevision)/mn.uRevision ## beta(b)
 
-#####**** (5) SET UP SAMPLE FUNCTION ******#####
+### (4) Define Hazard function parameters ####
+
+## Coefficients - on the log hazard scale
+mn.lngamma <- hazard.function$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
+mn.cons <- hazard.function$coefficient[2] ##Constant in survival analysis for baseline hazard
+mn.ageC <- hazard.function$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
+mn.maleC <- hazard.function$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
+mn.NP1 <- hazard.function$coefficient[5]
+mn <- c(mn.lngamma, mn.cons,mn.ageC,mn.maleC,mn.NP1) ## vector of mean values from the regression analysis
+cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
+
+
+##### (5) Sampling #####
 
 sim.runs <- 1000 
 
@@ -89,6 +89,23 @@ psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
   #### other variables which are defined above are called within the function
   ### e.g. cycles
   #### OUTPUTS: a list with data frames and vectors for probablistic parameters 
+  
+  #### Hazard function sampling
+  z <- matrix(rnorm(5*sim.runs, 0, 1), nrow = sim.runs, ncol = 5) ## 5 random draws, by sim.runs
+  r.table <- matrix(0, nrow = sim.runs, ncol = 5)
+  colnames(r.table) <- c("lngamma", "cons", "age", "male", "NP1")
+  
+  for(i in 1:sim.runs){
+    Tz <- cholm %*% z[i,] 
+    x <- mn + Tz 
+    r.table[i,] <- x[,1]
+  }
+  
+  r <- as.data.frame(r.table)
+  gamma.vec <- exp(r$lngamma)
+  lambda.vec <- exp(r$cons + age * r$age + male*r$male)
+  RR.vec <- exp(r$NP1)
+  survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
   
   ###  Transition probabilities
   tp.PTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead) ## OMR following primary THR
@@ -107,24 +124,7 @@ psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
                                    uSuccessP, uRevision, uSuccessR,
                                    udeath=rep(0, sim.runs))
   
-  ## (6) Hazard function sampling ####
-  z <- matrix(rnorm(5*sim.runs, 0, 1), nrow = sim.runs, ncol = 5) ## 5 random draws, by sim.runs
-  r.table <- matrix(0, nrow = sim.runs, ncol = 5)
-  colnames(r.table) <- c("lngamma", "cons", "age", "male", "NP1")
-  
-  for(i in 1:sim.runs){
-    Tz <- cholm %*% z[i,] 
-    x <- mn + Tz 
-    r.table[i,] <- x[,1]
-  }
-  
-  r <- as.data.frame(r.table)
-  gamma.vec <- exp(r$lngamma)
-  lambda.vec <- exp(r$cons + age * r$age + male*r$male)
-  RR.vec <- exp(r$NP1)
-  survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
-  
-  #### (7) Life-table sampling #####
+  #### (6) Life-table sampling #####
   
   # set life table values beased on age and sex (not probablistic but dependent on)
   # age and sex variables chosen
@@ -147,7 +147,7 @@ psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
 
 sample.output <- psa.sampling()
 
-### (8) Defining outputs from sampling #####
+### (7) Defining outputs from sampling #####
 RR.vec <- sample.output$RR.vec
 omr.df <- sample.output$omr.df
 tp.rrr.vec <- sample.output$tp.rrr.vec
