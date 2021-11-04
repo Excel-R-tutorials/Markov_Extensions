@@ -27,7 +27,7 @@ oDR <- 0.015 ## set the discount rate for outcomes (15%)
 discount.factor.c <- 1/(1+cDR)^cycle.v ## the discount factor matrix
 discount.factor.o <- 1/(1+oDR)^cycle.v  ## discount factor matrix for utility 
 
-##### (2) DETERMINISTIC PARAMETERS ######
+##### (2) Deterministic Parameters ######
 
 # COSTS:
 cSP0 <- 394 ## Cost of standard prosthesis
@@ -124,7 +124,7 @@ psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
                                    uSuccessP, uRevision, uSuccessR,
                                    udeath=rep(0, sim.runs))
   
-  #### (6) Life-table sampling #####
+  #### Life-table sampling 
   
   # set life table values beased on age and sex (not probablistic but dependent on)
   # age and sex variables chosen
@@ -147,7 +147,7 @@ psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
 
 sample.output <- psa.sampling()
 
-### (7) Defining outputs from sampling #####
+### Defining outputs from sampling
 RR.vec <- sample.output$RR.vec
 omr.df <- sample.output$omr.df
 tp.rrr.vec <- sample.output$tp.rrr.vec
@@ -158,11 +158,11 @@ mortality.vec <- sample.output$mortality.vec
 ## take a look at the above vectors and data.frames to see the samples produced
 ## these are defined out of the list here for use in the value of information analysis later on
 
-####***** (9) THR MODEL FUNCTION ****#####
-model.THR <- function(RR.NP1, ## from RR.vec
+#### (6) The THR Model Function #####
+model.THR <- function(RR.NP1, ## from RR.vec based on age/sex
                       omr,  ## from omr.df
                       tp.rrr, ## from tp.rrr.vec
-                      survival, ## from survival.df
+                      survival, ## from survival.df based on age/sex
                       c.revision, ## from c.revision.vec
                       state.util,## from state.utilities.df
                       mortality.vec) { ## background mortality based on life tables for age/sex combination
@@ -177,14 +177,14 @@ model.THR <- function(RR.NP1, ## from RR.vec
   # COSTS:
   state.costs<-c(cPrimary, cSuccess, c.revision, cSuccess, 0) ## a vector with the costs for each state
   # UTILITIES:
-  state.utilities <- unlist(state.util)
+  state.utilities <- unlist(state.util) ## unlist used to produce a vector from list formatting
   # TRANSITIONS
   tp.PTHR2dead <- unlist(omr[1,1])
   tp.RTHR2dead <- unlist(omr[1,2])
   gamma <- unlist(survival[1,1])
   lambda <- unlist(survival[1,2])
   
-  ### (10) Integrating revision and mortality risks #### 
+  ### Integrating revision and mortality risks  
   revision.risk.sp0 <- 1- exp(lambda * ((cycle.v-1) ^gamma-cycle.v ^gamma))
   revision.risk.np1 <- 1- exp(lambda * RR.NP1 * ((cycle.v-1) ^gamma-cycle.v ^gamma))
   # Transition arrays
@@ -209,7 +209,8 @@ model.THR <- function(RR.NP1, ## from RR.vec
   trace.SP0[1,] <- seed%*%tm.SP0[,,1]
   
   for (i in 2:cycles) trace.SP0[i,] <- trace.SP0[i-1,]%*%tm.SP0[,,i]
-  #### (11)  NP1 ARM #####
+  
+  ####  NP1 ARM 
   tm.NP1 <- array(data=0,dim=c(n.states, n.states, cycles),
                   dimnames= list(state.names, state.names, 1:cycles)) ## an empty array of dimenions (number of states, number of states, number of cycles)
   ## naming all dimensions
@@ -232,7 +233,7 @@ model.THR <- function(RR.NP1, ## from RR.vec
   trace.NP1[1,] <- seed%*%tm.NP1[,,1]
   for (i in 2:cycles) trace.NP1[i,] <- trace.NP1[i-1,]%*%tm.NP1[,,i]
   
-  #### (12) Analysis #####
+  #### Analysis
   # COST #
   cost.SP0 <- trace.SP0%*%state.costs  
   disc.cost.SP0 <- (discount.factor.c%*%cost.SP0) + cSP0   
@@ -256,7 +257,7 @@ model.THR <- function(RR.NP1, ## from RR.vec
   
 }
 
-#### (13) Running the simulations ########
+#### (7) Running the simulations ########
 
 ## creating an empty data.frame for simulation results to fill:
 simulation.results <- data.frame("cost.SP0" = rep(as.numeric(NA), sim.runs), ## use the rep() function to create sim.runs rows of values
@@ -277,7 +278,7 @@ for(i in 1:sim.runs){
 }
 
 
-### (14) Estimating average net monetary benefit ####
+### (8) Estimating average net monetary benefit ####
 
 p.CE<-function(WTP, simulation.results) {# Estimate the probability of cost-effectiveness for a given willingness-to-pay ceiling ratio
   ## a function that estimates the probability of the new intervention
@@ -301,13 +302,7 @@ for (i in 1:length(WTP.values)) {
   CEAC[i,"pCE"]<- p.CE(CEAC[i,"WTP"], simulation.results)
 }
 
-##### (15) Subgroup Analyses ######
-
-# CREATE ARRAY TO STORE THE RESULTS OF THE MODEL IN EACH SUBGROUP
-subgroups.names <- c("Male 40", "Male 60", "Male 80", "Female 40", "Female 60", "Female 80")
-subgroups.n <- length(subgroups.names)
-simulation.subgroups <- array(data = 0, dim = c(sim.runs, length(colnames(simulation.results)), subgroups.n),
-                              dimnames = list(1:sim.runs, colnames(simulation.results),subgroups.names))
+##### (9) Subgroup Analyses ######
 
 # Run model for each subgroup, inputting the age and sex into the function, and record results within the array
 sample.sub <- list()
@@ -317,6 +312,12 @@ sample.sub[[3]]<- psa.sampling(age = 80, male = 1)
 sample.sub[[4]]<- psa.sampling(age = 40, male = 0)
 sample.sub[[5]]<- psa.sampling(age = 60, male = 0)
 sample.sub[[6]]<- psa.sampling(age = 80, male = 0)
+
+# CREATE ARRAY TO STORE THE RESULTS OF THE MODEL IN EACH SUBGROUP
+subgroups.names <- c("Male 40", "Male 60", "Male 80", "Female 40", "Female 60", "Female 80")
+subgroups.n <- length(subgroups.names)
+simulation.subgroups <- array(data = 0, dim = c(sim.runs, length(colnames(simulation.results)), subgroups.n),
+                              dimnames = list(1:sim.runs, colnames(simulation.results),subgroups.names))
 
 for(i in 1:sim.runs){ 
   for(j in 1:6){ ## column = each subgroup
@@ -345,7 +346,7 @@ for (i in 1:length(WTP.values)) {
 
 ######***PLOTS****#####################
 
-#### (16) COST-EFFECTIVENESS PLANE #####
+#### (10) COST-EFFECTIVENESS PLANE #####
 ## Plotting:
 xlabel = "Incremental QALYs"
 ylabel = "Incremental costs"
@@ -359,6 +360,7 @@ ggplot(simulation.results) +
         legend.key.width=unit(1.8,"line"), text = element_text(size=12),
         plot.margin=unit(c(1.2,0.5,0,1.2),"cm"))
 
+### (11) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
 
 ## plotting:
 xlabel = "Willingness to pay threshold"
@@ -373,7 +375,7 @@ ggplot(CEAC) + geom_line(aes(x=WTP, y=pCE), size=1) +
   scale_x_continuous(expand = c(0, 0.1)) + 
   scale_y_continuous(limits = c(0,1), breaks=seq(0,1,0.1), expand = c(0, 0))
 
-### (17) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
+
 ## To plot the CEAC for subgroups We need to reshape the data from wide to long to use in ggplot 
 CEAC.subgroups.long <- melt(CEAC.subgroups, id.vars = c("WTP"))
 colnames(CEAC.subgroups.long) <- c("WTP", "group", "pCE")
