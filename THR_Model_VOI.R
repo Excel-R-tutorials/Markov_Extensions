@@ -3,6 +3,7 @@
 ##### (1) SET UP AND SOURCE THE THR MODEL #######
 
 # Loading in data and model
+# this also loads libraries called through "THR_Model.R"
 source("THR_Model.R")
 ## Note that simulation results are read in from this, and used throughout 
 # see head(simulation.results)
