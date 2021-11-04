@@ -2,13 +2,6 @@
 
 ##### (1) SET UP AND SOURCE THE THR MODEL #######
 
-### PACKAGES USED 
-# Install package and load library
-if(!require(reshape2)) install.packages('reshape2')
-library(reshape2)
-if(!require(ggplot2)) install.packages('ggplot2')
-library(ggplot2)
-
 # Loading in data and model
 source("THR_Model.R")
 ## Note that simulation results are read in from this, and used throughout 
