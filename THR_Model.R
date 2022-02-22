@@ -93,16 +93,7 @@ params$uRevision <- c(a = a.uRevision, b = b.uRevision, ab = ab.uRevision)
 # vector of mean values from the regression analysis
 params$hazard <- hazard.function$coefficient
 
-# 
-# mn.lngamma <- hazard.function$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
-# mn.cons <- hazard.function$coefficient[2] ##Constant in survival analysis for baseline hazard
-# mn.ageC <- hazard.function$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
-# mn.maleC <- hazard.function$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
-# mn.NP1 <- hazard.function$coefficient[5]
-# mn <- c(mn.lngamma, mn.cons,mn.ageC,mn.maleC,mn.NP1) ## vector of mean values from the regression analysis
-# cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
-# 
-
+# Covariance matrix 
 params$cov <- cov
 
 ##### (5) Sampling #####
@@ -120,10 +111,7 @@ psa.sampling <- function(age = 60,
   #### OUTPUTS: a list with data frames and vectors for probablistic parameters 
   
   #### Hazard function sampling
-  # z <- matrix(rnorm(5*sim.runs, 0, 1), nrow = sim.runs, ncol = 5) ## 5 random draws, by sim.runs (delete)
-  # r.table <- matrix(0, nrow = sim.runs, ncol = 5)  (delete)
-  # colnames(r.table) <- c("lngamma", "cons", "age", "male", "NP1")  (delete)
-  
+
   n.draws <- 5
   z <- matrix(      
           rnorm(n.draws*sim.runs, 0, 1),                   # normal distribution N(0,1)
@@ -136,7 +124,6 @@ psa.sampling <- function(age = 60,
   
   for(i in 1:sim.runs){
     Tz <- cholm %*% z[i,] 
-    #x <- mn + Tz #(delete)
     x <- params$hazard + Tz 
     r.table[i,] <- x[,1]
   }
@@ -148,28 +135,22 @@ psa.sampling <- function(age = 60,
   survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
   
   ###  Transition probabilities
-  #tp.PTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead) ## OMR following primary THR (delete)
   tp.PTHR2dead <- rbeta(sim.runs, params$PTHR2dead['a'], params$PTHR2dead['b']) ## OMR following primary THR
-  #tp.RTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead)  ## OMR following revision THR (delete)
   tp.RTHR2dead <- rbeta(sim.runs, params$PTHR2dead['a'], params$PTHR2dead['b'])  ## OMR following revision THR
   
   ## creating a data.frame of sampled transition probabilites
   omr.df <- data.frame(tp.PTHR2dead, tp.RTHR2dead) 
-  
+
   #tp.rrr.vec <-rbeta(sim.runs, a.rrr, b.rrr) ## Re-revision risk transitions vector (delete)
   tp.rrr.vec <-rbeta(sim.runs, params$rrr['a'], params$rrr['b']) ## Re-revision risk transitions vector
 
   
   ###  Costs
-  #c.revision.vec <- rgamma(sim.runs, shape=a.cRevision, scale=b.cRevision) ## Gamma distribution draw for cost of revision surgery (delete)
   c.revision.vec <- rgamma(sim.runs, 
                            shape = params$cRevision['shape'], 
                            scale = params$cRevision['scale']) ## Gamma distribution draw for cost of revision surgery
 
   ##  Utilities
-  # uSuccessP <- rbeta(sim.runs, a.uSuccessP, b.uSuccessP) (delete)
-  # uSuccessR <- rbeta(sim.runs, a.uSuccessR, b.uSuccessR) (delete)
-  # uRevision <- rbeta(sim.runs, a.uRevision, b.uRevision) (delete)
   uSuccessP <- rbeta(sim.runs, params$uSuccessP['a'], params$uSuccessP['b']) 
   uSuccessR <- rbeta(sim.runs, params$uSuccessR['a'], params$uSuccessR['b']) 
   uRevision <- rbeta(sim.runs, params$uRevision['a'], params$uRevision['b']) 
@@ -185,15 +166,11 @@ psa.sampling <- function(age = 60,
   # age and sex variables chosen
   current.age <- age + cycle.v ## a vector of cohort age throughout the model
   interval <- findInterval(current.age, life.tables$Index)
-  # death.risk <- data.frame(age = current.age,  (delete)
-  #                          males = life.tables[interval,3], 
-  #                          females = life.tables[interval,4])
   
   death.risk <- data.frame(age = current.age, 
                            male = life.tables[interval, 'Male'], 
                            female = life.tables[interval, 'Female'])
   
-  #col.key <- 3-male (delete) 
   col.key <- ifelse(male, "male", "female")
   mortality.vec <- death.risk[,col.key]
   
@@ -209,6 +186,7 @@ psa.sampling <- function(age = 60,
 
 sample.output <- psa.sampling(params = params, 
                               sim.runs = sim.runs)
+
 
 ### Defining outputs from sampling
 RR.vec <- sample.output$RR.vec
