@@ -347,12 +347,12 @@ for (i in 1:length(WTP.values)) {
 
 # Run model for each subgroup, inputting the age and sex into the function, and record results within the array
 sample.sub <- list()
-sample.sub[[1]]<- psa.sampling(age = 40, male = 1)
-sample.sub[[2]]<- psa.sampling(age = 60, male = 1)
-sample.sub[[3]]<- psa.sampling(age = 80, male = 1)
-sample.sub[[4]]<- psa.sampling(age = 40, male = 0)
-sample.sub[[5]]<- psa.sampling(age = 60, male = 0)
-sample.sub[[6]]<- psa.sampling(age = 80, male = 0)
+sample.sub[[1]]<- psa.sampling(age = 40, male = 1, params = params)
+sample.sub[[2]]<- psa.sampling(age = 60, male = 1, params = params)
+sample.sub[[3]]<- psa.sampling(age = 80, male = 1, params = params)
+sample.sub[[4]]<- psa.sampling(age = 40, male = 0, params = params)
+sample.sub[[5]]<- psa.sampling(age = 60, male = 0, params = params)
+sample.sub[[6]]<- psa.sampling(age = 80, male = 0, params = params)
 
 # CREATE ARRAY TO STORE THE RESULTS OF THE MODEL IN EACH SUBGROUP
 subgroups.names <- c("Male 40", "Male 60", "Male 80", "Female 40", "Female 60", "Female 80")
