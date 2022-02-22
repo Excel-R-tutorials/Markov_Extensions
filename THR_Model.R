@@ -4,8 +4,12 @@
 ### PACKAGES USED
 if(!require(ggplot2)) install.packages('ggplot2')
 library(ggplot2)
+
 if(!require(reshape2)) install.packages('reshape2')
 library(reshape2)
+
+# setting the seed for reproducible results in sampling
+set.seed(1234)
 
 #  Reading the data needed from csv files
 life.tables <- read.csv("life-table.csv", header=TRUE) ## importing lifetable
@@ -13,8 +17,6 @@ colnames(life.tables) <- c("Age","Index","Males","Female") ## making sure column
 hazard.function <- read.csv("hazardfunction.csv", header=TRUE) ## importing the hazard inputs from the regression analysis
 cov.55 <- read.csv("cov55.csv",row.names=1,header=TRUE) ## importing the covariance matrix
 
-# setting the seed for reproducible results in sampling
-set.seed(1234)
 
 ### Structural inputs
 state.names <- c("PrimaryTHR","SuccessP","RevisionTHR","SuccessR","Death")
@@ -29,23 +31,33 @@ discount.factor.o <- 1/(1+oDR)^cycle.v  ## discount factor matrix for utility
 
 ##### (2) Deterministic Parameters ######
 
+# Create a list to store parameters
+params <- list()
+
 # COSTS:
 cSP0 <- 394 ## Cost of standard prosthesis
 cNP1 <- 579 ## Cost of new prosthesis 1
 cPrimary <- 0  ## Cost of a primary THR procedure - set to 0 for this model 
 cSuccess <- 0 ## Cost of success - set to 0 for this model
 
-#### (3) Defining shape and scale values for probablistic parameters ####
+#### (3) Defining shape and scale values for probabilistic parameters ####
 mn.cRevision <- 5294 ## mean cost of revision surgery
 se.cRevision <- 1487 ## standard error of cost of revision surgery
-a.cRevision <- (mn.cRevision/se.cRevision)^2 ## alpha value for cost of revision surgery 
-b.cRevision <- (se.cRevision^2)/mn.cRevision ## beta value for cost of revision surgery
+a.cRevision <- (mn.cRevision/se.cRevision)^2 ## shape for cost of revision surgery 
+b.cRevision <- (se.cRevision^2)/mn.cRevision ## scale value for cost of revision surgery
+
+params$cRevision <- c(shape = a.cRevision, scale = b.cRevision)
 
 ###  Transition probabilities - alpha & beta values:
 a.PTHR2dead <- 2 ## alpha value for operative mortality from primary surgery
 b.PTHR2dead <- 100- a.PTHR2dead ## beta value for operative mortality from primary surgery
+
+params$PTHR2dead <- c(a = a.PTHR2dead, b = b.PTHR2dead)
+
 a.rrr <- 4   ## alpha value for re-revision risk
 b.rrr <- 100-a.rrr  ## beta value for re-revision risk
+
+params$rrr <- c(a = a.rrr, b = b.rrr)
 
 ##  UTILITIES:
 # primary prosthesis
@@ -54,12 +66,18 @@ se.uSuccessP <- 0.03 ## standard errror utility value for successful primary pro
 ab.uSuccessP <- mn.uSuccessP*(1-mn.uSuccessP)/(se.uSuccessP^2)-1 ## estimating alpha plus beta (ab)
 a.uSuccessP <- mn.uSuccessP*ab.uSuccessP ## estimating alpha (a)
 b.uSuccessP <- a.uSuccessP*(1-mn.uSuccessP)/mn.uSuccessP ## estimating beta (b)
+
+params$uSuccessP <- c(a = a.uSuccessP, b = b.uSuccessP, ab = ab.uSuccessP)
+
 ## revision surgery
 mn.uSuccessR <- 0.75 ## mean utility value for having a successful Revision THR
 se.uSuccessR <- 0.04 ## standard error utility value for having a successful Revision THR
 ab.uSuccessR <- mn.uSuccessR*(1-mn.uSuccessR)/(se.uSuccessR^2)-1 ## alpha + beta (ab)
 a.uSuccessR <- mn.uSuccessR*ab.uSuccessR ## alpha (a)
 b.uSuccessR <- a.uSuccessR*(1-mn.uSuccessR)/mn.uSuccessR ## beta(b)
+
+params$uSuccessR <- c(a = a.uSuccessR, b = b.uSuccessR, ab = ab.uSuccessR)
+
 ## during the revision period 
 mn.uRevision <- 0.30 ## mean utility score during the revision period
 se.uRevision <- 0.03 ## standard error utility score during the revision period
@@ -67,23 +85,32 @@ ab.uRevision <- mn.uRevision*(1-mn.uRevision)/(se.uRevision^2)-1 ## alpha + beta
 a.uRevision  <- mn.uRevision*ab.uRevision ## alpha (a)
 b.uRevision  <- a.uRevision*(1-mn.uRevision)/mn.uRevision ## beta(b)
 
+params$uRevision <- c(a = a.uRevision, b = b.uRevision, ab = ab.uRevision)
+
 ### (4) Define Hazard function parameters ####
 
 ## Coefficients - on the log hazard scale
-mn.lngamma <- hazard.function$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
-mn.cons <- hazard.function$coefficient[2] ##Constant in survival analysis for baseline hazard
-mn.ageC <- hazard.function$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
-mn.maleC <- hazard.function$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
-mn.NP1 <- hazard.function$coefficient[5]
-mn <- c(mn.lngamma, mn.cons,mn.ageC,mn.maleC,mn.NP1) ## vector of mean values from the regression analysis
-cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
+# vector of mean values from the regression analysis
+params$hazard <- hazard.function$coefficient
 
+# 
+# mn.lngamma <- hazard.function$coefficient[1] ## Ancilliary parameter in Weibull distribution - equivalent to lngamma coefficient
+# mn.cons <- hazard.function$coefficient[2] ##Constant in survival analysis for baseline hazard
+# mn.ageC <- hazard.function$coefficient[3] ## Age coefficient in survival analysis for baseline hazard
+# mn.maleC <- hazard.function$coefficient[4] ## Male coefficient in survival analysis for baseline hazard
+# mn.NP1 <- hazard.function$coefficient[5]
+# mn <- c(mn.lngamma, mn.cons,mn.ageC,mn.maleC,mn.NP1) ## vector of mean values from the regression analysis
+# cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
+# 
 
 ##### (5) Sampling #####
 
 sim.runs <- 1000 
 
-psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
+psa.sampling <- function(age = 60, 
+                         male = 0, 
+                         params,
+                         sim.runs = 1000){
   #### FUNCTION: sample probablistic parameters according to age and sex
   #### INPUTS: age (numeric), male (0 for female, 1 for male), though 
   #### other variables which are defined above are called within the function
@@ -108,17 +135,32 @@ psa.sampling <- function(age = 60, male = 0, sim.runs = 1000){
   survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
   
   ###  Transition probabilities
-  tp.PTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead) ## OMR following primary THR
-  tp.RTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead)  ## OMR following revision THR
+  #tp.PTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead) ## OMR following primary THR (delete)
+  tp.PTHR2dead <- rbeta(sim.runs, params$PTHR2dead['a'], params$PTHR2dead['b']) ## OMR following primary THR
+  #tp.RTHR2dead <- rbeta(sim.runs, a.PTHR2dead, b.PTHR2dead)  ## OMR following revision THR (delete)
+  tp.RTHR2dead <- rbeta(sim.runs, params$PTHR2dead['a'], params$PTHR2dead['b'])  ## OMR following revision THR
+  
   ## creating a data.frame of sampled transition probabilites
   omr.df <- data.frame(tp.PTHR2dead, tp.RTHR2dead) 
-  tp.rrr.vec <-rbeta(sim.runs, a.rrr, b.rrr) ## Re-revision risk transitions vector
+  
+  #tp.rrr.vec <-rbeta(sim.runs, a.rrr, b.rrr) ## Re-revision risk transitions vector (delete)
+  tp.rrr.vec <-rbeta(sim.runs, params$rrr['a'], params$rrr['b']) ## Re-revision risk transitions vector
+
+  
   ###  Costs
-  c.revision.vec <- rgamma(sim.runs, shape=a.cRevision, scale=b.cRevision) ## Gamma distribution draw for cost of revision surgery
+  #c.revision.vec <- rgamma(sim.runs, shape=a.cRevision, scale=b.cRevision) ## Gamma distribution draw for cost of revision surgery (delete)
+  c.revision.vec <- rgamma(sim.runs, 
+                           shape = params$cRevision['shape'], 
+                           scale = params$cRevision['scale']) ## Gamma distribution draw for cost of revision surgery
+
   ##  Utilities
-  uSuccessP <- rbeta(sim.runs, a.uSuccessP, b.uSuccessP) 
-  uSuccessR <- rbeta(sim.runs, a.uSuccessR, b.uSuccessR) 
-  uRevision <- rbeta(sim.runs, a.uRevision, b.uRevision) 
+  # uSuccessP <- rbeta(sim.runs, a.uSuccessP, b.uSuccessP) (delete)
+  # uSuccessR <- rbeta(sim.runs, a.uSuccessR, b.uSuccessR) (delete)
+  # uRevision <- rbeta(sim.runs, a.uRevision, b.uRevision) (delete)
+  uSuccessP <- rbeta(sim.runs, params$uSuccessP['a'], params$uSuccessP['b']) 
+  uSuccessR <- rbeta(sim.runs, params$uSuccessR['a'], params$uSuccessR['b']) 
+  uRevision <- rbeta(sim.runs, params$uRevision['a'], params$uRevision['b']) 
+  
   ## Make a data frame to pass into the function
   state.utilities.df <- data.frame(uprimary=rep(0, sim.runs), 
                                    uSuccessP, uRevision, uSuccessR,
