@@ -13,9 +13,9 @@ set.seed(1234)
 
 #  Reading the data needed from csv files
 life.tables <- read.csv("life-table.csv", header=TRUE) ## importing lifetable
-colnames(life.tables) <- c("Age","Index","Males","Female") ## making sure column names are correct
+colnames(life.tables) <- c("Age","Index","Male","Female") ## making sure column names are correct
 hazard.function <- read.csv("hazardfunction.csv", header=TRUE) ## importing the hazard inputs from the regression analysis
-cov.55 <- read.csv("cov55.csv",row.names=1,header=TRUE) ## importing the covariance matrix
+cov <- read.csv("cov55.csv",row.names=1,header=TRUE) ## importing the covariance matrix
 
 
 ### Structural inputs
@@ -103,6 +103,8 @@ params$hazard <- hazard.function$coefficient
 # cholm <- t(chol(t(cov.55))) ## lower triangle of the Cholesky decomposition
 # 
 
+params$cov <- cov
+
 ##### (5) Sampling #####
 
 sim.runs <- 1000 
@@ -118,13 +120,24 @@ psa.sampling <- function(age = 60,
   #### OUTPUTS: a list with data frames and vectors for probablistic parameters 
   
   #### Hazard function sampling
-  z <- matrix(rnorm(5*sim.runs, 0, 1), nrow = sim.runs, ncol = 5) ## 5 random draws, by sim.runs
-  r.table <- matrix(0, nrow = sim.runs, ncol = 5)
-  colnames(r.table) <- c("lngamma", "cons", "age", "male", "NP1")
+  # z <- matrix(rnorm(5*sim.runs, 0, 1), nrow = sim.runs, ncol = 5) ## 5 random draws, by sim.runs (delete)
+  # r.table <- matrix(0, nrow = sim.runs, ncol = 5)  (delete)
+  # colnames(r.table) <- c("lngamma", "cons", "age", "male", "NP1")  (delete)
+  
+  n.draws <- 5
+  z <- matrix(      
+          rnorm(n.draws*sim.runs, 0, 1),                   # normal distribution N(0,1)
+          nrow = sim.runs, ncol = n.draws)                 # n_draws random samples, by sim.runs
+  r.table <- matrix(0, nrow = sim.runs, ncol = n.draws)
+  colnames(r.table) <- names(params$cov)
+  
+  cholm <- t(chol(t(params$cov)))             # lower triangle of the Cholesky decomposition
+  
   
   for(i in 1:sim.runs){
     Tz <- cholm %*% z[i,] 
-    x <- mn + Tz 
+    #x <- mn + Tz #(delete)
+    x <- params$hazard + Tz 
     r.table[i,] <- x[,1]
   }
   
@@ -168,26 +181,34 @@ psa.sampling <- function(age = 60,
   
   #### Life-table sampling 
   
-  # set life table values beased on age and sex (not probablistic but dependent on)
+  # set life table values based on age and sex (not probabilistic but dependent on)
   # age and sex variables chosen
   current.age <- age + cycle.v ## a vector of cohort age throughout the model
   interval <- findInterval(current.age, life.tables$Index)
-  death.risk <- data.frame(age = current.age, males = life.tables[interval,3], females = life.tables[interval,4])
-  col.key <- 3-male 
+  # death.risk <- data.frame(age = current.age,  (delete)
+  #                          males = life.tables[interval,3], 
+  #                          females = life.tables[interval,4])
+  
+  death.risk <- data.frame(age = current.age, 
+                           male = life.tables[interval, 'Male'], 
+                           female = life.tables[interval, 'Female'])
+  
+  #col.key <- 3-male (delete) 
+  col.key <- ifelse(male, "male", "female")
   mortality.vec <- death.risk[,col.key]
   
   ## combine outputs
-  sample.output <- list(RR.vec = RR.vec,
-                        omr.df = omr.df,
-                        tp.rrr.vec = tp.rrr.vec,
-                        survival.df = survival.df,
-                        c.revision.vec = c.revision.vec,
-                        state.utilities.df = state.utilities.df,
-                        mortality.vec = mortality.vec)
-  return(sample.output)
+  return(list(RR.vec = RR.vec,
+              omr.df = omr.df,
+              tp.rrr.vec = tp.rrr.vec,
+              survival.df = survival.df,
+              c.revision.vec = c.revision.vec,
+              state.utilities.df = state.utilities.df,
+              mortality.vec = mortality.vec))
 }
 
-sample.output <- psa.sampling()
+sample.output <- psa.sampling(params = params, 
+                              sim.runs = sim.runs)
 
 ### Defining outputs from sampling
 RR.vec <- sample.output$RR.vec
