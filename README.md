@@ -1,27 +1,28 @@
-# Markov_Extensions
+# Extensions of Health Economic Evaluation in R for Microsoft Excel Users: A Tutorial for Incorporating Heterogeneity and Conducting Value of Information Analyses
 
-[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
+> This is the repo for the journal paper _Extensions of Health Economic Evaluation in R for Microsoft Excel Users: A Tutorial for Incorporating Heterogeneity and Conducting Value of Information Analyses_ by 
+Nichola R. Naylor & Jack Williams (joint first author), Nathan Green, Felicity Lamrock, Andrew Briggs.
 
-## About
+## Abstract
 
-This repository corresponds to the tutorial paper entitled "Extensions of Health Economic Evaluation in R for Microsoft Excel Users: A Tutorial for incorporating heterogeneity and conducting value of information analyses". 
+Advanced health economic analysis techniques currently performed in Excel, such as incorporating heterogeneity, time-dependent transitions and value of information analysis, can be easily transferred to R. Whilst previous R tutorials for health economists have focused on setting up Markov models and probabilistic sensitivity analyses, there is a need for more detailed exploration and explanation of how to develop more advanced Markov models in R. This tutorial provides a step-by-step guide of how to incorporate heterogeneity and value of information with Markov models in R, through side-by-side comparisons of how such analyses are done in Excel. Though there are papers highlighting the efficiency benefits of R in comparison to Excel, and general tutorials of how to perform health economic analyses in R, we hope that this paper can act as a reference point to those switching more complex models from Excel to R. We provide open-access code and data, suitable for future adaptation.
 
-## Repo Contents
+## Contents
 
-* The original THR model R script: THR_Model.R
+File | Description
+-----|------------
+[THR_Model.R](https://github.com/Excel-R-tutorials/Markov_Extensions/blob/main/THR_Model.R) | R script of the main model functions
+[THR_Model_VOI.R](https://github.com/Excel-R-tutorials/Markov_Extensions/blob/main/THR_Model_VOI.R) | R script containing the value of information analysis functions
+[hazardfunction.csv](https://github.com/Excel-R-tutorials/Markov_Extensions/blob/main/hazardfunction.csv) | CSV file containing the output of the survival analysis
+[cov55.csv](https://github.com/Excel-R-tutorials/Markov_Extensions/blob/main/cov55.csv) | CSV file containing the corresponding covariance matrix of the suvival analysis
+[life-table.csv](https://github.com/Excel-R-tutorials/Markov_Extensions/blob/main/life-table.csv) | CSV file containing the life-table data
 
-* An R script providing code to perform Value of Information analyses on the THR model: THR_Model_VOI.R
+## How to Cite this Code
 
-* All necessary data files to run the relevant R scripts: life-table.csv, hazardfunction.csv, cov55.csv.
+Nichola R. Naylor* & Jack Williams*, Nathan Green, Felicity Lamrock, Andrew Briggs (2022) Extensions of Health Economic Evaluation in R for Microsoft Excel Users: A Tutorial for Incorporating Heterogeneity and Conducting Value of Information Analyses. GitHub (https://github.com/Excel-R-tutorials/Markov_Extensions)
 
-* The excel versions of the model which was downloaded from "https://www.herc.ox.ac.uk/downloads/decision-modelling-for-health-economic-evaluation" written by Andrew Briggs, Mark Sculpher and Karl Claxton [last accessed 25/08/2021]: (i) Ex57sol.xls which corresponds to THR_Model.R, (ii) ExcelVersion_Ex66bsol.xls which corresponds to THR_Model_VOI.R
+*joint first authors that wrote the majority of this code.
 
-### How to Cite this Work
+## 👂 Feedback
 
-<TO ADD>
-
-### Other information
-
-Please either raise issues on the github repo or contact chilgithub@lshtm.ac.uk, either Nichola or Jack can then respond to any queries. 
-
- 
+Please feel free to raise an issue on this GitHub, or email any feedback to chilgithub@lshtm.ac.uk, either Nichola or Jack can then respond to any queries.
