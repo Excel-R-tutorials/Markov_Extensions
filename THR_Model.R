@@ -385,9 +385,9 @@ for (i in 1:length(WTP.values)) {
 }
 
 
-######***PLOTS****#####################
+######***(10) Graphical Outputs ****#####################
 
-#### (10) COST-EFFECTIVENESS PLANE #####
+#### (a) COST-EFFECTIVENESS PLANE #####
 ## Plotting:
 xlabel = "Incremental QALYs"
 ylabel = "Incremental costs"
@@ -401,7 +401,7 @@ ggplot(simulation.results) +
         legend.key.width=unit(1.8,"line"), text = element_text(size=12),
         plot.margin=unit(c(1.2,0.5,0,1.2),"cm"))
 
-### (11) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
+### (b) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
 
 ## plotting:
 xlabel = "Willingness to pay threshold"
