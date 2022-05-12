@@ -91,7 +91,7 @@ params$uRevision <- c(a = a.uRevision, b = b.uRevision, ab = ab.uRevision)
 
 ## Coefficients - on the log hazard scale
 # vector of mean values from the regression analysis
-params$hazard <- hazard.function$coefficient
+params$coeff <- hazard.function$coefficient
 
 # Covariance matrix 
 params$cov <- cov
@@ -111,28 +111,29 @@ psa.sampling <- function(age = 60,
   #### OUTPUTS: a list with data frames and vectors for probablistic parameters 
   
   #### Hazard function sampling
-
+  cholm <- t(chol(t(params$cov)))             # lower triangle of the Cholesky decomposition
+  
   n.draws <- 5
-  z <- matrix(      
+ 
+  temp.values <- matrix(      
           rnorm(n.draws*sim.runs, 0, 1),                   # normal distribution N(0,1)
           nrow = sim.runs, ncol = n.draws)                 # n_draws random samples, by sim.runs
-  r.table <- matrix(0, nrow = sim.runs, ncol = n.draws)
-  colnames(r.table) <- names(params$cov)
-  
-  cholm <- t(chol(t(params$cov)))             # lower triangle of the Cholesky decomposition
+  coeff.table <- matrix(0, nrow = sim.runs, ncol = n.draws)
+  colnames(coeff.table) <- names(params$cov)
   
   
   for(i in 1:sim.runs){
-    Tz <- cholm %*% z[i,] 
-    x <- params$hazard + Tz 
-    r.table[i,] <- x[,1]
+    Tz <- cholm %*% temp.values[i,] 
+    x <- params$coeff + Tz 
+    coeff.table[i,] <- x[,1]
   }
   
-  r <- as.data.frame(r.table)
-  gamma.vec <- exp(r$lngamma)
-  lambda.vec <- exp(r$cons + age * r$age + male*r$male)
-  RR.vec <- exp(r$NP1)
-  survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
+  coeff.table <- as.data.frame(coeff.table)
+  gamma.vec <- exp(coeff.table$lngamma)
+  lambda.vec <- exp(coeff.table$cons + age * coeff.table$age 
+                    + male*coeff.table$male)
+  RR.vec <- exp(coeff.table$NP1)
+  survival.df <- data.frame(gamma.vec,lambda.vec)            ## creating a data.frame with the parameters
   
   ###  Transition probabilities
   tp.PTHR2dead <- rbeta(sim.runs, params$PTHR2dead['a'], params$PTHR2dead['b']) ## OMR following primary THR
