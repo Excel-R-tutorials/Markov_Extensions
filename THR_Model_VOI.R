@@ -1,6 +1,6 @@
 ########### THR MODEL: VALUE OF INFORMATION ##############
 
-##### (1) SET UP AND SOURCE THE THR MODEL #######
+##### (1) Set up model script and source THR model functions  #######
 
 # Loading in data and model
 # this also loads libraries called through "THR_Model.R"
@@ -8,7 +8,7 @@ source("THR_Model.R")
 ## Note that simulation results are read in from this, and used throughout 
 # see head(simulation.results)
 
-#### (2) SETTING VALUE OF INFORMATION POPULATION PARAMETERS ####
+#### (2) Setting value of information population parameters ####
 
 population <- 40000 
 years <- 10
@@ -19,7 +19,7 @@ effective.population <- sum(population.seq)
 WTP.values <- seq(from = 0, to = 50000, by = 50)
 
 
-#### (3) CREATE EXPECTED VALUE OF PERFECT INFORMATION (EVPI) AT A POPULATION LEVEL ####
+#### (3) Expected value of perfect information (EVPI) at the population level ####
 
 est.EVPI.pop <-function(WTP, effective.population, simulation.results) {
 
@@ -55,7 +55,7 @@ for (i in 1:length(WTP.values)) {
 ## Show the highest EVPI value
 EVPI.results[EVPI.results$EVPI == max(EVPI.results$EVPI),] 
 
-#### (4) SET INNER AND OUTER LOOP FRAMEWORK FOR EXPECTED VALUE OF PARTIAL PERFECT INFORMATION (EVPPI) ANALYSIS #### 
+#### (4) Setting up the EVPPI inner and outer loop framework #### 
 
 ## Enter inner and outer loop numbers - note these must be higher than sim.runs 
 inner.loops <- 100
@@ -69,7 +69,7 @@ evppi.results.SP0 <- matrix(0, nrow = outer.loops, ncol = length(WTP.values))
 colnames(evppi.results.SP0) <- as.character(WTP.values)
 evppi.results.NP1 <- evppi.results.SP0 
 
-##### (5) NET MONETARY BENEFIT FUNCTION #######
+##### (5) The Net Monetary Benefit Function #######
 
 # Creating a function to estimate NMB across WTP values (for inner loop results)
 nmb.function <- function(WTP, results){
@@ -87,7 +87,7 @@ nmb.function <- function(WTP, results){
   
 }
 
-##### (6) EVPPI FUNCTION FOR WILLINGNESS-TO-PAY VALUES #####
+##### (6) Calculating EVPPI values for Willingness to Pay Values  #####
 
 ## Function to estimate EVPPI across WTP values, using the outer loop results
 gen.evppi.results <- function(evppi.results1 = evppi.results.SP0, evppi.results2 = evppi.results.NP1, WTP = WTP.values, effective.pop = effective.population){
@@ -117,7 +117,7 @@ gen.evppi.results <- function(evppi.results1 = evppi.results.SP0, evppi.results2
   
 }
 
-#### (7) RUN EVPPI SIMULATIONS ######
+#### (7) Run all EVPPI simulations  ######
 
 ## Now the EVPPI loops will be run - each selected different values for inner and outer loops
 parameter.groups <- 6 ## number of parameters/parameter groups to run the EVPPI on
@@ -166,9 +166,9 @@ for(j in 1:parameter.groups){
 # Preview of results 
 head(evppi.wide,20)
 
-#####**** PLOTS *****#####
+######*** Graphical Outputs ****#####################
 
-##### (8) Ploting results EVPI, per population ####
+##### (a) Ploting results EVPI, per population ####
 ggplot(EVPI.results) + geom_line(aes(x=WTP, y=EVPI), size=1) + 
   labs(x = "Willingness to pay threshold", text = element_text(size=10)) + 
   labs(y = "Expected Value of Perfect Information", text = element_text(size=10)) + theme_classic() +
@@ -181,7 +181,7 @@ ggplot(EVPI.results) + geom_line(aes(x=WTP, y=EVPI), size=1) +
   scale_x_continuous(labels = scales::comma, expand = c(0, 0.1)) + 
   scale_y_continuous(labels = scales::comma, expand = c(0, 0))
 
-#### (9) PLOTTING EVPPI RESULTS ACROSS WILLINGNESS-TO-PAY THRESHOLDS ####
+#### (b) PLOTTING EVPPI RESULTS ACROSS WILLINGNESS-TO-PAY THRESHOLDS ####
 
 # Convert from wide to long format
 evppi.long <- reshape2::melt(evppi.wide, id.vars = c("WTP"))
@@ -201,7 +201,7 @@ ggplot(evppi.long) + geom_line(aes(x=WTP, y=value, colour = variable), size=0.75
 
 
 
-#### (10) PLOTTING EVPPI RESULTS AT A WILLINGNESS-TO-PAY THRESHOLD VALUE ####
+#### (c) PLOTTING EVPPI RESULTS AT A WILLINGNESS-TO-PAY THRESHOLD VALUE ####
 
 sub.evppi <- subset(evppi.long, WTP==2200)
 

@@ -29,7 +29,7 @@ oDR <- 0.015 ## set the discount rate for outcomes (15%)
 discount.factor.c <- 1/(1+cDR)^cycle.v ## the discount factor matrix
 discount.factor.o <- 1/(1+oDR)^cycle.v  ## discount factor matrix for utility 
 
-##### (2) Deterministic Parameters ######
+##### (2) Define Deterministic Parameters ######
 
 # Create a list to store parameters
 params <- list()
@@ -40,7 +40,7 @@ cNP1 <- 579 ## Cost of new prosthesis 1
 cPrimary <- 0  ## Cost of a primary THR procedure - set to 0 for this model 
 cSuccess <- 0 ## Cost of success - set to 0 for this model
 
-#### (3) Defining shape and scale values for probabilistic parameters ####
+#### (3) Define shape and scale values for probabilistic parameters ####
 mn.cRevision <- 5294 ## mean cost of revision surgery
 se.cRevision <- 1487 ## standard error of cost of revision surgery
 a.cRevision <- (mn.cRevision/se.cRevision)^2 ## shape for cost of revision surgery 
@@ -299,7 +299,7 @@ model.THR <- function(RR.NP1, ## from RR.vec based on age/sex
   
 }
 
-#### (7) Running the simulations ########
+#### (7) Run the simulations ########
 
 ## creating an empty data.frame for simulation results to fill:
 simulation.results <- data.frame("cost.SP0" = rep(as.numeric(NA), sim.runs), ## use the rep() function to create sim.runs rows of values
@@ -386,7 +386,7 @@ for (i in 1:length(WTP.values)) {
 }
 
 
-######***(10) Graphical Outputs ****#####################
+######*** Graphical Outputs ****#####################
 
 #### (a) COST-EFFECTIVENESS PLANE #####
 ## Plotting:
