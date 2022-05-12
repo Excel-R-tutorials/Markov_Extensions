@@ -87,7 +87,7 @@ b.uRevision  <- a.uRevision*(1-mn.uRevision)/mn.uRevision ## beta(b)
 
 params$uRevision <- c(a = a.uRevision, b = b.uRevision, ab = ab.uRevision)
 
-### (4) Define Hazard function parameters ####
+### (4) Define Hazard function coefficient and covariance values ####
 
 ## Coefficients - on the log hazard scale
 # vector of mean values from the regression analysis
