@@ -1,6 +1,6 @@
 ############ THR model #########################
 
-##### (1) Set-up Model ######
+##### (1) Set up Model ######
 ### PACKAGES USED
 if(!require(ggplot2)) install.packages('ggplot2')
 library(ggplot2)
