@@ -1,6 +1,6 @@
 ############ THR model #########################
 
-##### (1) Set-up Model ######
+##### (1) Set up Model ######
 ### PACKAGES USED
 if(!require(ggplot2)) install.packages('ggplot2')
 library(ggplot2)
@@ -29,7 +29,7 @@ oDR <- 0.015 ## set the discount rate for outcomes (15%)
 discount.factor.c <- 1/(1+cDR)^cycle.v ## the discount factor matrix
 discount.factor.o <- 1/(1+oDR)^cycle.v  ## discount factor matrix for utility 
 
-##### (2) Deterministic Parameters ######
+##### (2) Define Deterministic Parameters ######
 
 # Create a list to store parameters
 params <- list()
@@ -40,7 +40,7 @@ cNP1 <- 579 ## Cost of new prosthesis 1
 cPrimary <- 0  ## Cost of a primary THR procedure - set to 0 for this model 
 cSuccess <- 0 ## Cost of success - set to 0 for this model
 
-#### (3) Defining shape and scale values for probabilistic parameters ####
+#### (3) Define shape and scale values for probabilistic parameters ####
 mn.cRevision <- 5294 ## mean cost of revision surgery
 se.cRevision <- 1487 ## standard error of cost of revision surgery
 a.cRevision <- (mn.cRevision/se.cRevision)^2 ## shape for cost of revision surgery 
@@ -87,11 +87,11 @@ b.uRevision  <- a.uRevision*(1-mn.uRevision)/mn.uRevision ## beta(b)
 
 params$uRevision <- c(a = a.uRevision, b = b.uRevision, ab = ab.uRevision)
 
-### (4) Define Hazard function parameters ####
+### (4) Define Hazard function coefficient and covariance values ####
 
 ## Coefficients - on the log hazard scale
 # vector of mean values from the regression analysis
-params$hazard <- hazard.function$coefficient
+params$coeff <- hazard.function$coefficient
 
 # Covariance matrix 
 params$cov <- cov
@@ -111,28 +111,29 @@ psa.sampling <- function(age = 60,
   #### OUTPUTS: a list with data frames and vectors for probablistic parameters 
   
   #### Hazard function sampling
-
+  cholm <- t(chol(t(params$cov)))             # lower triangle of the Cholesky decomposition
+  
   n.draws <- 5
-  z <- matrix(      
+ 
+  temp.values <- matrix(      
           rnorm(n.draws*sim.runs, 0, 1),                   # normal distribution N(0,1)
           nrow = sim.runs, ncol = n.draws)                 # n_draws random samples, by sim.runs
-  r.table <- matrix(0, nrow = sim.runs, ncol = n.draws)
-  colnames(r.table) <- names(params$cov)
-  
-  cholm <- t(chol(t(params$cov)))             # lower triangle of the Cholesky decomposition
+  coeff.table <- matrix(0, nrow = sim.runs, ncol = n.draws)
+  colnames(coeff.table) <- names(params$cov)
   
   
   for(i in 1:sim.runs){
-    Tz <- cholm %*% z[i,] 
-    x <- params$hazard + Tz 
-    r.table[i,] <- x[,1]
+    Tz <- cholm %*% temp.values[i,] 
+    x <- params$coeff + Tz 
+    coeff.table[i,] <- x[,1]
   }
   
-  r <- as.data.frame(r.table)
-  gamma.vec <- exp(r$lngamma)
-  lambda.vec <- exp(r$cons + age * r$age + male*r$male)
-  RR.vec <- exp(r$NP1)
-  survival.df <- data.frame(gamma.vec,lambda.vec)## creating a data.frame with the parameters
+  coeff.table <- as.data.frame(coeff.table)
+  gamma.vec <- exp(coeff.table$lngamma)
+  lambda.vec <- exp(coeff.table$cons + age * coeff.table$age 
+                    + male*coeff.table$male)
+  RR.vec <- exp(coeff.table$NP1)
+  survival.df <- data.frame(gamma.vec,lambda.vec)            ## creating a data.frame with the parameters
   
   ###  Transition probabilities
   tp.PTHR2dead <- rbeta(sim.runs, params$PTHR2dead['a'], params$PTHR2dead['b']) ## OMR following primary THR
@@ -298,7 +299,7 @@ model.THR <- function(RR.NP1, ## from RR.vec based on age/sex
   
 }
 
-#### (7) Running the simulations ########
+#### (7) Run the simulations ########
 
 ## creating an empty data.frame for simulation results to fill:
 simulation.results <- data.frame("cost.SP0" = rep(as.numeric(NA), sim.runs), ## use the rep() function to create sim.runs rows of values
@@ -385,9 +386,9 @@ for (i in 1:length(WTP.values)) {
 }
 
 
-######***PLOTS****#####################
+######*** Graphical Outputs ****#####################
 
-#### (10) COST-EFFECTIVENESS PLANE #####
+#### (a) COST-EFFECTIVENESS PLANE #####
 ## Plotting:
 xlabel = "Incremental QALYs"
 ylabel = "Incremental costs"
@@ -401,7 +402,7 @@ ggplot(simulation.results) +
         legend.key.width=unit(1.8,"line"), text = element_text(size=12),
         plot.margin=unit(c(1.2,0.5,0,1.2),"cm"))
 
-### (11) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
+### (b) COST-EFFECTIVENESS ACCEPTABILITY CURVES ####
 
 ## plotting:
 xlabel = "Willingness to pay threshold"
