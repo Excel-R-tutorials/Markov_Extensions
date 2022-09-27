@@ -57,7 +57,7 @@ EVPI.results[EVPI.results$EVPI == max(EVPI.results$EVPI),]
 
 #### (4) Setting up the EVPPI inner and outer loop framework #### 
 
-## Enter inner and outer loop numbers 
+## Enter inner and outer loop numbers - note this must not be higher than sim.runs
 inner.loops <- 100
 outer.loops <- 100
 
